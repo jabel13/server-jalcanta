@@ -9,7 +9,7 @@ COPY . .
 RUN go mod tidy
 
 # Build a statically-linked Go binary for Linux
-RUN CGO_ENABLED=0 GOOS=linux go build -a -o main .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o main .
 
 # New build phase -- create binary-only image
 FROM alpine:latest
