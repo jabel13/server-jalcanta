@@ -10,6 +10,7 @@ import (
     "github.com/aws/aws-sdk-go/aws/session"
     "github.com/aws/aws-sdk-go/service/dynamodb"
     "github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+	"github.com/go-playground/validator/v10"
 )
 
 type Outcome struct {
@@ -31,9 +32,10 @@ type LogEntry struct {
 	Status   int    `json:"status"`
 }
 
+// Define the SearchParams struct with validation rules
 type SearchParams struct {
-    ID  string // ID is a string up to 100 characters
-    Key string // Key is a string up to 50 characters
+    ID  string `validate:"omitempty,alphanum,max=100"` // ID should be alphanumeric, up to 100 characters
+    Key string `validate:"omitempty,alpha,max=50"`      // Key should be alphabetic, up to 50 characters
 }
 
 // custom response writer to capture the HTTP status code
@@ -127,6 +129,13 @@ func statusHandler(w http.ResponseWriter, req *http.Request) {
     }
 }
 
+// Create a validator instance
+var validate *validator.Validate
+
+func init() {
+    validate = validator.New()
+}
+
 func searchHandler(w http.ResponseWriter, req *http.Request) {
 
    svc := getDynamoDBClient()
@@ -135,17 +144,21 @@ func searchHandler(w http.ResponseWriter, req *http.Request) {
    id := req.URL.Query().Get("id")
    key := req.URL.Query().Get("key")
 
-   // Check if 'Key' contains numbers
-   for _, char := range key {
-	   if char >= '0' && char <= '9' {
-		   http.Error(w, "400 Bad Request", http.StatusBadRequest)
-		   return
-	   }
+   searchParams := SearchParams{
+	ID:  req.URL.Query().Get("id"),
+	Key: req.URL.Query().Get("key"),
+}
+
+   // Validate the searchParams
+   err := validate.Struct(searchParams)
+   if err != nil {
+	   // Return a 400 Bad Request with the validation error message
+	   http.Error(w, "400 Bad Request", http.StatusBadRequest)
+	   return
    }
 
    // Variables to store the results and any potential error
    var items []Item
-   var err error
 
    // If 'id' is provided, perform a Query operation
    if id != "" {
@@ -171,7 +184,7 @@ func searchHandler(w http.ResponseWriter, req *http.Request) {
 
 	   // Perform the query operation on DynamoDB
 	   var queryResult *dynamodb.QueryOutput
-	   queryResult, err := svc.Query(queryInput)
+	   queryResult, err = svc.Query(queryInput)
 	   if err != nil {
 		   http.Error(w, err.Error(), http.StatusInternalServerError)
 		   return
