@@ -45,15 +45,8 @@ type responseWriter struct {
 }
 
 func allHandler(w http.ResponseWriter, req *http.Request) {
-    sess, err := session.NewSession(&aws.Config{
-        Region: aws.String(os.Getenv("AWS_DEFAULT_REGION")),
-    })
-    if err != nil {
-        log.Fatalf("Failed to create AWS session: %s", err)
-    }
-
-    // Create DynamoDB client
-    svc := dynamodb.New(sess)
+    
+    svc := dynamodb.New(awsSession)
 
     // Define the Scan input parameters
     params := &dynamodb.ScanInput{
@@ -95,14 +88,14 @@ func statusHandler(w http.ResponseWriter, req *http.Request) {
     // Define the table name
     tableName := "nba-odds-jalcanta"
 
-	svc := getDynamoDBClient()
+	svc := dynamodb.New(awsSession)
 
-	    // Define the input parameters for the DescribeTable operation
+	// Define the input parameters for the DescribeTable operation
     input := &dynamodb.DescribeTableInput{
         TableName: aws.String(tableName),
     }
 
-	    // Perform the DescribeTable operation
+	// Perform the DescribeTable operation
     result, err := svc.DescribeTable(input)
     if err != nil {
         http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -129,25 +122,21 @@ func statusHandler(w http.ResponseWriter, req *http.Request) {
     }
 }
 
-// Create a validator instance
-var validate *validator.Validate
-
-func init() {
-    validate = validator.New()
-}
 
 func searchHandler(w http.ResponseWriter, req *http.Request) {
 
-   svc := getDynamoDBClient()
+    svc := dynamodb.New(awsSession)
 
-   // Get 'id' and 'key' from query parameters
-   id := req.URL.Query().Get("id")
-   key := req.URL.Query().Get("key")
+    validate := validator.New()
 
-   searchParams := SearchParams{
-	ID:  req.URL.Query().Get("id"),
-	Key: req.URL.Query().Get("key"),
-}
+    // Get 'id' and 'key' from query parameters
+    id := req.URL.Query().Get("id")
+    key := req.URL.Query().Get("key")
+
+    searchParams := SearchParams{
+	ID:  id,
+	Key: key,
+    }
 
    // Validate the searchParams
    err := validate.Struct(searchParams)
@@ -157,15 +146,19 @@ func searchHandler(w http.ResponseWriter, req *http.Request) {
 	   return
    }
 
-   // Variables to store the results and any potential error
+   // Slice to store the unmarshalled results from DynamoDB
    var items []Item
 
    // If 'id' is provided, perform a Query operation
    if id != "" {
+    // exprAttrNames and exprAttrValues are maps used to define placeholders for attribute names and values in the query.
+    // The query will look for items in the DynamoDB table where the 'id' attribute matches the provided 'id' 
 	   exprAttrNames := map[string]*string{"#id": aws.String("id")}
+
 	   exprAttrValues := map[string]*dynamodb.AttributeValue{
 		   ":idValue": {S: aws.String(id)},
 	   }
+
 	   keyCondExpr := "#id = :idValue"
 
 	   // Add Key condition if 'key' is also provided
@@ -184,6 +177,7 @@ func searchHandler(w http.ResponseWriter, req *http.Request) {
 
 	   // Perform the query operation on DynamoDB
 	   var queryResult *dynamodb.QueryOutput
+
 	   queryResult, err = svc.Query(queryInput)
 	   if err != nil {
 		   http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -216,6 +210,7 @@ func searchHandler(w http.ResponseWriter, req *http.Request) {
 
         // Perform the scan operation on DynamoDB
         var scanResult *dynamodb.ScanOutput
+
         scanResult, err = svc.Scan(scanInput)
         if err != nil {
             http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -285,22 +280,18 @@ func (rw *responseWriter) WriteHeader(status int) {
 	rw.ResponseWriter.WriteHeader(status)
 }
 
-func getDynamoDBClient() *dynamodb.DynamoDB {
-    if awsSession == nil {
-		var err error
-		awsSession, err = session.NewSession(&aws.Config{
-			Region: aws.String(os.Getenv("AWS_DEFAULT_REGION")),
-		})
-		if err != nil {
-			log.Fatalf("Failed to create AWS session: %s", err)
-		}
-	}
-    return dynamodb.New(awsSession)
-}
-
 var awsSession *session.Session
 
 func main() {
+
+    // Initialize AWS session
+    var err error
+    awsSession, err = session.NewSession(&aws.Config{
+        Region: aws.String(os.Getenv("AWS_DEFAULT_REGION")),
+    })
+    if err != nil {
+        log.Fatalf("Failed to create AWS session: %s", err)
+    }
 
 	// Set up the router
 	r := mux.NewRouter()
