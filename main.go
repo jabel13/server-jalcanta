@@ -219,7 +219,7 @@ func searchHandler(w http.ResponseWriter, req *http.Request) {
 
 		// Check if the scan returns no results and return a 204 No content if true
         if len(scanResult.Items) == 0 {
-            http.Error(w, "204 Page Not Found", http.StatusNoContent)
+            http.Error(w, "204 No Content", http.StatusNoContent)
             return
         }
 
