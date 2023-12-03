@@ -184,9 +184,9 @@ func searchHandler(w http.ResponseWriter, req *http.Request) {
 		   return
 	   }
 
-	   // If the query returns no results, return a 404 Not Found
+	   // If the query returns no results, return a 204 no content found
 	   if len(queryResult.Items) == 0 {
-		   http.Error(w, "404 Page Not Found", http.StatusNotFound)
+		   http.Error(w, "204 No Content", http.StatusNoContent)
 		   return
 	   }
 
@@ -217,9 +217,9 @@ func searchHandler(w http.ResponseWriter, req *http.Request) {
             return
         }
 
-		// Check if the scan returns no results and return a 404 Not Found if true
+		// Check if the scan returns no results and return a 204 No content if true
         if len(scanResult.Items) == 0 {
-            http.Error(w, "404 Page Not Found", http.StatusNotFound)
+            http.Error(w, "204 Page Not Found", http.StatusNoContent)
             return
         }
 
